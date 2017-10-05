@@ -5,3 +5,6 @@
    * Get Def. of header
    * Get Def. of routines
    * Get Def. of game file
+
+# Useful commands
+* `paste (xxd -b -c 16 data/anchor.z8|psub) (xxd data/anchor.z8|psub) | head`
