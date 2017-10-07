@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path"
@@ -166,28 +167,39 @@ type Game struct {
 func newGame(fileName string) (*Game, error) {
 	gf, err := os.Open(path.Clean(fileName))
 	if err != nil {
-		return nil, fmt.Errorf("Couldn't load game ", err)
+		return nil, fmt.Errorf("Couldn't load game %s", err)
 	}
 
 	g := &Game{}
 	g.size, err = gf.Read(g.data)
 	if err != nil {
-		return nil, fmt.Errorf("Couldn't load game ", err)
+		return nil, fmt.Errorf("Couldn't load game %s", err)
 	}
 
 	g.header, err = newHeader(g.data)
 	if err != nil {
-		return nil, fmt.Errorf("Couldn't load game ", err)
+		return nil, fmt.Errorf("Couldn't load game %s", err)
 	}
 
 	return g, nil
 }
 
 func newHeader(d []byte) (*Header, error) {
-	h := &Header{data: d[0:296]}
+	if len(d) < 37 {
+		return nil, errors.New("data not long enough to contain header")
+	}
+	h := &Header{data: d[0:37]}
 	return h, nil
 }
 
 func (h *Header) getVersion() byte {
 	return h.data[0:1][0]
+}
+
+func (h *Header) getHiMemAddr() uint16 {
+	return uint16(h.data[5])<<8 | uint16(h.data[4])
+}
+
+func (h *Header) getObjTableAddr() uint16 {
+	return uint16(h.data[0xb])<<8 | uint16(h.data[0xa])
 }
