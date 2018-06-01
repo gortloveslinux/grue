@@ -154,12 +154,12 @@ Hex |V  |Dyn |Int |Rst |Contents
 */
 
 type Header struct {
-	data []byte
+	data []uint8
 }
 
 type Game struct {
 	header *Header
-	data   []byte
+	data   []uint8
 	size   int
 }
 
@@ -183,11 +183,23 @@ func newGame(fileName string) (*Game, error) {
 	return g, nil
 }
 
-func newHeader(d []byte) (*Header, error) {
+func newHeader(d []uint8) (*Header, error) {
 	h := &Header{data: d[0:296]}
 	return h, nil
 }
 
-func (h *Header) getVersion() byte {
+func (h *Header) getVersion() uint8 {
 	return h.data[0:1][0]
+}
+
+func (h *Header) getFlags() uint8 {
+	return 0
+}
+
+func (h *Header) getHiMemBase() uint16 {
+	return uint16(h.data[4])<<8 | uint16(h.data[5])
+}
+
+func (h *Header) getInitialPC() uint16 {
+	return uint16(h.data[6])<<8 | uint16(h.data[7])
 }
