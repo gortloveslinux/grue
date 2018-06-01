@@ -166,18 +166,18 @@ type Game struct {
 func newGame(fileName string) (*Game, error) {
 	gf, err := os.Open(path.Clean(fileName))
 	if err != nil {
-		return nil, fmt.Errorf("Couldn't load game ", err)
+		return nil, fmt.Errorf("Couldn't load game %s", err)
 	}
 
 	g := &Game{}
 	g.size, err = gf.Read(g.data)
 	if err != nil {
-		return nil, fmt.Errorf("Couldn't load game ", err)
+		return nil, fmt.Errorf("Couldn't load game %s", err)
 	}
 
 	g.header, err = newHeader(g.data)
 	if err != nil {
-		return nil, fmt.Errorf("Couldn't load game ", err)
+		return nil, fmt.Errorf("Couldn't load game %s", err)
 	}
 
 	return g, nil

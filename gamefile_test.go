@@ -7,23 +7,7 @@ import (
 
 var testFile = "data/anchor.z8"
 
-func testNewHeader(t *testing.T) {
-	gf, err := os.Open(testFile)
-	if err != nil {
-		t.Error("Couldn't load file ", err)
-	}
-
-	var b []uint8
-	_, err = gf.Read(b)
-	if err != nil {
-		t.Error("Couldn't load file ", err)
-	}
-
-	h, _ := newHeader(b)
-	if len(h.data) != 296 {
-		t.Error("Header is the wrong size")
-	}
-}
+const maxFileSize = 524288
 
 func testGetVersion(t *testing.T) {
 	h := setupHeader(t, testFile)
@@ -59,13 +43,11 @@ func setupHeader(t *testing.T, filename string) *Header {
 	if err != nil {
 		t.Fatal("Couldn't load file ", err)
 	}
-
 	var b []uint8
 	_, err = gf.Read(b)
 	if err != nil {
 		t.Fatal("Couldn't read file ", err)
 	}
-
 	h, err := newHeader(b)
 	if err != nil {
 		t.Fatal("Couldn't create header ", err)
