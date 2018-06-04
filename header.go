@@ -1,40 +1,5 @@
 package main
 
-import (
-	"fmt"
-	"os"
-	"path"
-)
-
-/* OPCODES
-A single Z-machine instruction consists of the following sections (and in the order shown):
-  Opcode               1 or 2 bytes
-  (Types of operands)  1 or 2 bytes: 4 or 8 2-bit fields
-  Operands             Between 0 and 8 of these: each 1 or 2 bytes
-  (Store variable)     1 byte
-  (Branch offset)      1 or 2 bytes
-  (Text to print)      An encoded string (of unlimited length)
-*/
-
-/* ROUTINES
-5.1
-A routine is required to begin at an address in memory which can be represented by a packed address (for instance, in Version 5 it must occur at a byte address which is divisible by 4).
-5.2
-A routine begins with one byte indicating the number of local variables it has (between 0 and 15 inclusive).
-5.2.1
-In Versions 1 to 4, that number of 2-byte words follows, giving initial values for these local variables. In Versions 5 and later, the initial values are all zero.
-5.3
-Execution of instructions begins from the byte after this header information. There is no formal 'end-marker' for a routine (it is simply assumed that execution eventually results in a return taking place).
-5.4
-In Version 6, there is a "main" routine (whose packed address is stored in the word at $06 in the header) called when the game starts up. It is illegal to return from this routine.
-5.5
-In all other Versions, the word at $06 contains the byte address of the first instruction to execute. The Z-machine starts in an environment with no local variables from which, again, a return is illegal.
-------
-Remarks
-Note that it is permissible for a routine to be in dynamic memory. Marnix Klooster suggests this might be used for compiling code at run time!
-In Versions 3 and 4, Inform always stores 0 as the initial values for local variables.
-*/
-
 /* HEADER
 ----+---+----+----+----+--------------------------------------------------------------------------------------+
 Hex |V  |Dyn |Int |Rst |Contents
@@ -152,54 +117,34 @@ Hex |V  |Dyn |Int |Rst |Contents
 36  |5  |    |    |    |Header extension table address (bytes)
 ----+---+----+----+----+--------------------------------------------------------------------------------------+
 */
-
-type Header struct {
-	data []uint8
+type ZHeader struct {
+	version           uint8
+	flags1            uint8
+	hiMemBase         uint16
+	ip                uint16
+	mainRoutine       uint8
+	dictAddress       uint32
+	objTableAddress   uint32
+	globalVarAddress  uint32
+	staticMemAddress  uint32
+	flags2            uint8
+	abbreviationTable uint32
+	fileLength        uint32
+	checksum          uint16
 }
 
-type Game struct {
-	header *Header
-	data   []uint8
-	size   int
-}
-
-func newGame(fileName string) (*Game, error) {
-	gf, err := os.Open(path.Clean(fileName))
-	if err != nil {
-		return nil, fmt.Errorf("Couldn't load game %s", err)
-	}
-
-	g := &Game{}
-	g.size, err = gf.Read(g.data)
-	if err != nil {
-		return nil, fmt.Errorf("Couldn't load game %s", err)
-	}
-
-	g.header, err = newHeader(g.data)
-	if err != nil {
-		return nil, fmt.Errorf("Couldn't load game %s", err)
-	}
-
-	return g, nil
-}
-
-func newHeader(d []uint8) (*Header, error) {
-	h := &Header{data: d[0:296]}
-	return h, nil
-}
-
-func (h *Header) getVersion() uint8 {
-	return h.data[0:1][0]
-}
-
-func (h *Header) getFlags() uint8 {
-	return 0
-}
-
-func (h *Header) getHiMemBase() uint16 {
-	return uint16(h.data[4])<<8 | uint16(h.data[5])
-}
-
-func (h *Header) getInitialPC() uint16 {
-	return uint16(h.data[6])<<8 | uint16(h.data[7])
+func (zh *ZHeader) load(buf []byte) {
+	zh.version = buf[0x0]
+	zh.flags1 = buf[0x1]
+	zh.hiMemBase = getUint16(buf, 0x4)
+	zh.ip = getUint16(buf, 0x6)
+	zh.mainRoutine = buf[0x7]
+	zh.dictAddress = uint32(getUint16(buf, 0x8))
+	zh.objTableAddress = uint32(getUint16(buf, 0xa))
+	zh.globalVarAddress = uint32(getUint16(buf, 0xc))
+	zh.staticMemAddress = uint32(getUint16(buf, 0xe))
+	zh.flags2 = buf[0x10]
+	zh.abbreviationTable = uint32(getUint16(buf, 0x18))
+	zh.fileLength = uint32(getUint16(buf, 0x1a))
+	zh.checksum = getUint16(buf, 0x1c)
 }

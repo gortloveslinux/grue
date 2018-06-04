@@ -1,9 +1,22 @@
 package main
 
+import (
+	"io/ioutil"
+	"log"
+	"os"
+)
+
 func main() {
-	/*	fileName := os.Args[1]
+	fileName := os.Args[1]
+	buf, err := ioutil.ReadFile(fileName)
+	if err != nil {
+		panic(err)
+	}
 
-		header := &Header{loc: map[version]int{v8: 0}, len: map[version]int{v8: 296}}
+	logger := log.New(os.Stdout, "", 0)
 
-		header.readHeaderFromFile(gf)*/
+	var zm ZMachine
+	zm.Init(buf, logger.Printf)
+
+	zm.InterpretInstruction()
 }
