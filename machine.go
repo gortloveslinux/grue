@@ -1,5 +1,7 @@
 package main
 
+import "fmt"
+
 /* OPCODES
 A single Z-machine instruction consists of the following sections (and in the order shown):
   Opcode               1 or 2 bytes
@@ -36,6 +38,14 @@ type ZMachine struct {
 	logger func(string, ...interface{})
 }
 
+const (
+	operand_mask     = 0x3
+	operand_omitted  = 0x3
+	operand_variable = 0x2
+	operand_small    = 0x1
+	operand_large    = 0x0
+)
+
 func getUint16(buf []byte, offset uint32) uint16 {
 	return (uint16(buf[offset]) << 8) | (uint16)(buf[offset+1])
 }
@@ -65,31 +75,118 @@ func (zm *ZMachine) readByte() uint8 {
 	return zm.buf[zm.ip-1]
 }
 
-func (zm *ZMachine) InterpretInstruction() {
+func (zm *ZMachine) readShort() uint16 {
+	zm.ip = zm.ip + 2
+	return getUint16(zm.buf, zm.ip-2)
+}
+
+func (zm *ZMachine) InterpretInstruction() error {
 	op := zm.peekByte()
-	zm.logger("ip: %x, op: %x\n", zm.ip, op)
+	context := fmt.Sprintf("ip: %x, opcode: %x\n", zm.ip, op)
 
 	if op == 0xbe && zm.header.version >= 5 {
-		zm.logger("Extended codes not implemented yet")
-		// return error?
+		zm.logger("Extended form instructions not implemented yet")
+		return nil
 	} else if op>>6 == 0x3 {
-		// var operation form
-		zm.InterpretVarInstruction()
+		zm.logger("Interpreting VAR form instruction: %s", context)
+		return zm.InterpretVarInstruction()
 	} else if op>>6 == 0x2 {
-		// short operation form
-		zm.logger("short form instructions not implemented yet")
+		zm.logger("Short form instructions not implemented yet")
+		return nil
 	}
-	// long operation form
-	zm.InterpretLongInstruction()
+	zm.logger("Long form instructions not implemented yet")
+	return nil
 }
 
-func (zm *ZMachine) InterpretLongInstruction() {
+// In variable form, if bit 5 is 0 then the count is 2OP; if it is 1, then the count is VAR.
+// The opcode number is given in the bottom 5 bits.
+func (zm *ZMachine) InterpretVarInstruction() error {
+	opcode := zm.readByte()
+	opcount := opcode >> 5 & 0x1
+	instruction := opcode & 0x1f
+	zm.logger("instruction: %x, operand count: %x\n", instruction, opcount)
 
+	if opcount == 0 {
+		// 2OP instructions
+		return nil
+	}
+	// VAR OP instruction
+	switch instruction {
+	case 0x0:
+		return zm.zCall()
+	default:
+		return fmt.Errorf("Unknown instruction: %x, ip: %x", opcode, zm.ip)
+	}
 }
 
-func (zm *ZMachine) InterpretVarInstruction() {
-	//opcode := zm.readByte()
-	//opcount :=
+func (zm *ZMachine) zCall() error {
+	args, _, err := zm.getOperands()
+	if err != nil {
+		return fmt.Errorf("error interpreting call instruction. ip: %x. %v", zm.ip, err)
+	}
+	addr, err := zm.getPackedAddress(args[0], true)
+	if err != nil {
+		return fmt.Errorf("error interpreting call instruction. ip: %x. %v", zm.ip, err)
+	}
+
+	zm.logger("Call %x", addr)
+	return nil
+}
+
+// In variable or extended forms, a byte of 4 operand types is given next.
+// This contains 4 2-bit fields: bits 6 and 7 are the first field, bits 0 and 1 the fourth.
+// The values are operand types as above. Once one type has been given as 'omitted', all subsequent ones must be.
+// Example: $$00101111 means large constant followed by variable (and no third or fourth opcode).
+func (zm *ZMachine) getOperands() ([]uint16, uint16, error) {
+	args := make([]uint16, 4)
+	argc := uint16(0)
+	opTypes := zm.readByte()
+	for i := uint8(0); i < 4; i++ {
+		optyp := (opTypes >> (6 - i)) & 0x3
+		if optyp == operand_omitted {
+			break
+		}
+		switch optyp {
+		case operand_variable:
+			// to implement
+		case operand_small:
+			// to implement
+		case operand_large:
+			args[i] = zm.readShort()
+		default:
+			return nil, 0, fmt.Errorf("unknown operand type: %x, operand number: %x, ip: %x", optyp, i, zm.ip-1)
+		}
+	}
+
+	return args, argc, nil
+}
+
+// A packed address specifies where a routine or string begins in high memory.
+// Given a packed address P, the formula to obtain the corresponding byte address B is:
+//
+//  2P           Versions 1, 2 and 3
+//  4P           Versions 4 and 5
+//  4P + 8R_O    Versions 6 and 7, for routine calls
+//  4P + 8S_O    Versions 6 and 7, for print_paddr
+//  8P           Version 8
+//R_O and S_O are the routine and strings offsets (specified in the header as words at $28 and $2a, respectively).
+func (zm *ZMachine) getPackedAddress(addr uint16, routine bool) (uint32, error) {
+	switch zm.header.version {
+	case 1, 2, 3:
+		return uint32(addr) * 2, nil
+	case 4, 5:
+		return uint32(addr) * 4, nil
+	case 6, 7:
+		offset := zm.header.stringOffset
+		if routine {
+			offset = zm.header.routineOffset
+		}
+		return uint32(addr)*4 + 8*uint32(offset), nil
+	case 8:
+		return uint32(addr) * 8, nil
+	default:
+		return 0, fmt.Errorf("unsupported version for packed address. version: %x", zm.header.version)
+	}
 }
 
 func (zm *ZMachine) verify() {

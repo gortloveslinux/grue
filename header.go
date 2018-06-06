@@ -131,6 +131,8 @@ type ZHeader struct {
 	abbreviationTable uint32
 	fileLength        uint32
 	checksum          uint16
+	routineOffset     uint16
+	stringOffset      uint16
 }
 
 func (zh *ZHeader) load(buf []byte) {
@@ -147,4 +149,6 @@ func (zh *ZHeader) load(buf []byte) {
 	zh.abbreviationTable = uint32(getUint16(buf, 0x18))
 	zh.fileLength = uint32(getUint16(buf, 0x1a))
 	zh.checksum = getUint16(buf, 0x1c)
+	zh.routineOffset = getUint16(buf, 0x28)
+	zh.stringOffset = getUint16(buf, 0x2a)
 }
